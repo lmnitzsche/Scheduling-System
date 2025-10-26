@@ -1,0 +1,179 @@
+name: Quest Quality Gate
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  # Code Quality and Testing
+  quality-gate:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 🎮 Checkout Quest Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: ⚡ Setup Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: 📦 Install Quest Dependencies
+      run: npm ci
+
+    - name: 🔍 Lint Check
+      run: npm run lint
+
+    - name: 🎯 Type Check
+      run: npm run type-check
+
+    - name: 🧪 Run All Tests
+      run: npm run test -- --coverage
+
+    - name: 📊 Upload Coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        flags: unittests
+        name: quest-scheduler-coverage
+
+    - name: 🏗️ Test Production Build
+      run: npm run build
+      env:
+        VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+        VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+    - name: 📏 Bundle Size Check
+      uses: andresz1/size-limit-action@v1
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Accessibility Testing
+  accessibility-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 🎮 Checkout Quest Code
+      uses: actions/checkout@v4
+
+    - name: ⚡ Setup Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: 📦 Install Dependencies
+      run: npm ci
+
+    - name: 🏗️ Build Application
+      run: npm run build
+      env:
+        VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+        VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+    - name: 🎯 Run Accessibility Tests
+      run: |
+        npx serve -s dist -p 3000 &
+        sleep 5
+        npx @axe-core/cli http://localhost:3000 --exit
+
+  # Visual Regression Testing (if we had Chromatic set up)
+  visual-testing:
+    runs-on: ubuntu-latest
+    if: false # Disabled for now, enable when Chromatic is set up
+    
+    steps:
+    - name: 🎮 Checkout Quest Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: ⚡ Setup Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: 📦 Install Dependencies
+      run: npm ci
+
+    - name: 📸 Run Visual Tests
+      run: npm run chromatic
+      env:
+        CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+
+  # Performance Testing
+  lighthouse-ci:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 🎮 Checkout Quest Code
+      uses: actions/checkout@v4
+
+    - name: ⚡ Setup Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: 📦 Install Dependencies
+      run: npm ci
+
+    - name: 🏗️ Build Application
+      run: npm run build
+      env:
+        VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+        VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+    - name: 🚦 Run Lighthouse CI
+      run: |
+        npx serve -s dist -p 3000 &
+        sleep 5
+        npx @lhci/cli@0.12.x autorun
+      env:
+        LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+  # Comment PR with Results
+  pr-comment:
+    needs: [quality-gate, accessibility-test]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: 🎮 Create PR Comment
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { owner, repo, number } = context.issue;
+          const qualityStatus = '${{ needs.quality-gate.result }}';
+          const a11yStatus = '${{ needs.accessibility-test.result }}';
+          
+          let emoji = '✅';
+          let message = 'All quest quality checks passed! Ready for adventure! 🎮';
+          
+          if (qualityStatus === 'failure' || a11yStatus === 'failure') {
+            emoji = '❌';
+            message = 'Some quest checks failed. The realm needs your attention! ⚔️';
+          } else if (qualityStatus === 'cancelled' || a11yStatus === 'cancelled') {
+            emoji = '⏸️';
+            message = 'Quest checks were cancelled. Try again, brave adventurer! 🛡️';
+          }
+          
+          const comment = `## ${emoji} Quest Quality Report
+          
+          **Quality Gate:** ${qualityStatus === 'success' ? '✅ Passed' : qualityStatus === 'failure' ? '❌ Failed' : '⏸️ Cancelled'}
+          **Accessibility:** ${a11yStatus === 'success' ? '✅ Passed' : a11yStatus === 'failure' ? '❌ Failed' : '⏸️ Cancelled'}
+          
+          ${message}
+          
+          *May your code be bug-free and your quests be epic! 🚀*`;
+          
+          github.rest.issues.createComment({
+            owner,
+            repo,
+            issue_number: number,
+            body: comment
+          });
