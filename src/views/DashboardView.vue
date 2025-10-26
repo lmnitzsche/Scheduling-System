@@ -1,358 +1,361 @@
 <template>
-  <div class="dashboard-view min-h-screen bg-quest-darker p-6">
-    <div class="max-w-7xl mx-auto">
-      <!-- Header -->
-      <div class="mb-8">
-        <h1 class="text-4xl font-bold text-neon-green mb-2">
-          Welcome back, {{ playerStore.player?.username || 'Hero' }}! 🎮
-        </h1>
-        <p class="text-gray-300">
-          Ready to conquer today's quests? Your productivity adventure awaits!
-        </p>
-      </div>
-
-      <!-- Top Stats Row -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <!-- Player Progress -->
-        <div class="lg:col-span-2">
-          <XpBar />
-        </div>
-        
-        <!-- Quick Actions -->
-        <div class="card">
-          <h3 class="text-lg font-bold text-neon-blue mb-4">Quick Actions</h3>
-          <div class="space-y-3">
-            <button 
-              @click="showCreateQuest = true"
-              class="btn-primary w-full py-2 text-sm"
-            >
-              ⚔️ Create New Quest
-            </button>
-            <router-link 
-              to="/calendar"
-              class="btn-secondary w-full py-2 text-sm block text-center"
-            >
-              📅 View Calendar
-            </router-link>
-            <router-link 
-              to="/achievements"
-              class="bg-quest-accent hover:bg-yellow-600 text-quest-darker w-full py-2 text-sm block text-center rounded transition-colors"
-            >
-              🏆 Achievements
-            </router-link>
-          </div>
-        </div>
-      </div>
-
-      <!-- Main Content Grid -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Today's Quests -->
-        <div class="lg:col-span-2">
-          <div class="card">
-            <div class="flex items-center justify-between mb-6">
-              <h2 class="text-2xl font-bold text-neon-green">Today's Quests 📋</h2>
-              <div class="text-sm text-gray-400">
-                {{ completedToday.length }} / {{ todaysQuests.length }} completed
-              </div>
-            </div>
-
-            <!-- Progress Bar for Today -->
-            <div class="progress-bar mb-6">
-              <div 
-                class="progress-fill"
-                :style="{ width: `${todayProgress}%` }"
-              ></div>
-            </div>
-
-            <!-- Quest List -->
-            <div v-if="todaysQuests.length === 0" class="text-center py-12">
-              <div class="text-6xl mb-4">🎯</div>
-              <h3 class="text-xl font-bold text-gray-400 mb-2">No quests for today!</h3>
-              <p class="text-gray-500 mb-4">Time to create some epic adventures!</p>
-              <button 
-                @click="showCreateQuest = true"
-                class="btn-primary"
-              >
-                Create Your First Quest! 🚀
-              </button>
-            </div>
-
-            <div v-else class="space-y-4">
-              <QuestCard
-                v-for="quest in todaysQuests"
-                :key="quest.id"
-                :quest="quest"
-                @complete="completeQuest"
-                @edit="editQuest"
-                @delete="deleteQuest"
-              />
-            </div>
-          </div>
-        </div>
-
-        <!-- Sidebar -->
-        <div class="space-y-6">
-          <!-- Overdue Quests Warning -->
-          <div v-if="overdueQuests.length > 0" class="card border-red-500 bg-red-900/20">
-            <div class="flex items-center space-x-2 mb-3">
-              <span class="text-2xl">⚠️</span>
-              <h3 class="text-lg font-bold text-red-400">Overdue Quests!</h3>
-            </div>
-            <p class="text-sm text-gray-300 mb-4">
-              You have {{ overdueQuests.length }} overdue quest{{ overdueQuests.length !== 1 ? 's' : '' }}. 
-              Complete them to get back on track!
-            </p>
-            <router-link 
-              to="/quests"
-              class="btn-danger w-full text-center block"
-            >
-              View Overdue Quests
-            </router-link>
-          </div>
-
-          <!-- Daily Streak -->
-          <div class="card">
-            <div class="flex items-center space-x-2 mb-3">
-              <span class="text-2xl">🔥</span>
-              <h3 class="text-lg font-bold text-neon-pink">Daily Streak</h3>
-            </div>
-            <div class="text-center">
-              <div class="text-3xl font-bold text-neon-pink">{{ playerStore.stats?.currentStreak || 0 }}</div>
-              <div class="text-sm text-gray-400">days in a row!</div>
-            </div>
-            <div class="mt-4 text-xs text-gray-400">
-              {{ streakMessage }}
-            </div>
-          </div>
-
-          <!-- Recent Achievements -->
-          <div class="card">
-            <div class="flex items-center space-x-2 mb-4">
-              <span class="text-2xl">🏆</span>
-              <h3 class="text-lg font-bold text-quest-accent">Recent Achievements</h3>
-            </div>
-            
-            <div v-if="recentAchievements.length === 0" class="text-center py-4">
-              <div class="text-gray-400 text-sm">
-                Complete quests to unlock achievements! 🎯
-              </div>
-            </div>
-            
-            <div v-else class="space-y-2">
-              <div 
-                v-for="achievement in recentAchievements" 
-                :key="achievement.id"
-                class="bg-quest-darker p-3 rounded-lg border-l-4 border-quest-accent"
-              >
-                <div class="flex items-center space-x-2">
-                  <span class="text-lg">{{ achievement.icon }}</span>
-                  <div>
-                    <div class="font-bold text-sm">{{ achievement.name }}</div>
-                    <div class="text-xs text-gray-400">{{ achievement.description }}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <router-link 
-              to="/achievements"
-              class="btn-secondary w-full mt-4 text-center block text-sm"
-            >
-              View All Achievements
-            </router-link>
-          </div>
-
-          <!-- Productivity Tip -->
-          <div class="card border-quest-accent bg-yellow-900/10">
-            <div class="flex items-center space-x-2 mb-3">
-              <span class="text-2xl">💡</span>
-              <h3 class="text-lg font-bold text-quest-accent">Pro Tip</h3>
-            </div>
-            <p class="text-sm text-gray-300">
-              {{ dailyTip }}
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Create Quest Modal -->
-    <div 
-      v-if="showCreateQuest"
-      class="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4"
-      @click.self="showCreateQuest = false"
-    >
-      <div class="bg-quest-dark p-6 rounded-lg max-w-md w-full border-2 border-quest-primary">
-        <h3 class="text-xl font-bold text-neon-green mb-4">Create New Quest 🎯</h3>
-        
-        <!-- Quick Quest Form -->
-        <form @submit.prevent="createQuest">
-          <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-bold text-gray-300 mb-2">Quest Title</label>
-              <input 
-                v-model="newQuest.title"
-                type="text" 
-                class="w-full p-3 bg-quest-darker border-2 border-quest-primary rounded-lg text-white"
-                placeholder="Enter your epic quest..."
-                required
-              >
-            </div>
-            
-            <div>
-              <label class="block text-sm font-bold text-gray-300 mb-2">Difficulty</label>
-              <select 
-                v-model="newQuest.difficulty"
-                class="w-full p-3 bg-quest-darker border-2 border-quest-primary rounded-lg text-white"
-              >
-                <option value="Easy">Easy (25 XP)</option>
-                <option value="Medium">Medium (50 XP)</option>
-                <option value="Hard">Hard (100 XP)</option>
-                <option value="Epic">Epic (200 XP)</option>
-                <option value="Legendary">Legendary (500 XP)</option>
-              </select>
-            </div>
-            
-            <div>
-              <label class="block text-sm font-bold text-gray-300 mb-2">Due Date</label>
-              <input 
-                v-model="newQuest.dueDate"
-                type="datetime-local" 
-                class="w-full p-3 bg-quest-darker border-2 border-quest-primary rounded-lg text-white"
-                required
-              >
-            </div>
+  <div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-gray-200">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center h-16">
+          <div class="flex items-center">
+            <h1 class="text-xl font-semibold text-gray-900">TaskMaster</h1>
           </div>
           
-          <div class="flex space-x-3 mt-6">
-            <button type="submit" class="btn-primary flex-1">
-              🚀 Create Quest!
-            </button>
-            <button 
-              type="button"
-              @click="showCreateQuest = false"
-              class="btn-secondary px-4"
+          <div class="flex items-center space-x-4">
+            <span class="text-sm text-gray-600">
+              {{ authStore.user ? authStore.user.email : 'Guest User' }}
+            </span>
+            
+            <button
+              v-if="authStore.user"
+              @click="signOut"
+              class="btn-secondary text-sm"
             >
-              Cancel
+              Sign Out
             </button>
+            <router-link
+              v-else
+              to="/login"
+              class="btn-primary text-sm"
+            >
+              Sign In
+            </router-link>
           </div>
-        </form>
+        </div>
       </div>
-    </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <!-- Stats Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="card">
+          <div class="flex items-center">
+            <div class="p-3 bg-primary-100 rounded-lg">
+              <ClipboardDocumentListIcon class="h-6 w-6 text-primary-600" />
+            </div>
+            <div class="ml-4">
+              <p class="text-sm font-medium text-gray-600">Total Tasks</p>
+              <p class="text-2xl font-semibold text-gray-900">{{ taskStore.tasks.length }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="flex items-center">
+            <div class="p-3 bg-success-100 rounded-lg">
+              <CheckCircleIcon class="h-6 w-6 text-success-600" />
+            </div>
+            <div class="ml-4">
+              <p class="text-sm font-medium text-gray-600">Completed</p>
+              <p class="text-2xl font-semibold text-gray-900">{{ taskStore.completedTasks.length }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="flex items-center">
+            <div class="p-3 bg-warning-100 rounded-lg">
+              <ClockIcon class="h-6 w-6 text-warning-600" />
+            </div>
+            <div class="ml-4">
+              <p class="text-sm font-medium text-gray-600">Today</p>
+              <p class="text-2xl font-semibold text-gray-900">{{ taskStore.todayTasks.length }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="flex items-center">
+            <div class="p-3 bg-danger-100 rounded-lg">
+              <ExclamationTriangleIcon class="h-6 w-6 text-danger-600" />
+            </div>
+            <div class="ml-4">
+              <p class="text-sm font-medium text-gray-600">Overdue</p>
+              <p class="text-2xl font-semibold text-gray-900">{{ taskStore.overdueTasks.length }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Task Management -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Task Form -->
+        <div class="lg:col-span-1">
+          <div class="card">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Add New Task</h2>
+            
+            <form @submit.prevent="createTask" class="space-y-4">
+              <div>
+                <label for="title" class="block text-sm font-medium text-gray-700">
+                  Title
+                </label>
+                <input
+                  id="title"
+                  v-model="newTask.title"
+                  type="text"
+                  required
+                  class="input mt-1"
+                  placeholder="Enter task title"
+                />
+              </div>
+
+              <div>
+                <label for="description" class="block text-sm font-medium text-gray-700">
+                  Description
+                </label>
+                <textarea
+                  id="description"
+                  v-model="newTask.description"
+                  rows="3"
+                  class="input mt-1"
+                  placeholder="Enter task description"
+                ></textarea>
+              </div>
+
+              <div>
+                <label for="priority" class="block text-sm font-medium text-gray-700">
+                  Priority
+                </label>
+                <select
+                  id="priority"
+                  v-model="newTask.priority"
+                  class="input mt-1"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="dueDate" class="block text-sm font-medium text-gray-700">
+                  Due Date
+                </label>
+                <input
+                  id="dueDate"
+                  v-model="newTask.dueDate"
+                  type="datetime-local"
+                  class="input mt-1"
+                />
+              </div>
+
+              <button
+                type="submit"
+                :disabled="taskStore.loading || !newTask.title.trim()"
+                class="btn-primary w-full"
+              >
+                <span v-if="!taskStore.loading">Add Task</span>
+                <span v-else class="flex items-center">
+                  <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Adding...
+                </span>
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Task List -->
+        <div class="lg:col-span-2">
+          <div class="card">
+            <div class="flex justify-between items-center mb-4">
+              <h2 class="text-lg font-semibold text-gray-900">Tasks</h2>
+              <div class="flex space-x-2">
+                <button
+                  @click="filter = 'all'"
+                  :class="[
+                    'px-3 py-1 text-sm rounded-md',
+                    filter === 'all' ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:text-gray-700'
+                  ]"
+                >
+                  All
+                </button>
+                <button
+                  @click="filter = 'pending'"
+                  :class="[
+                    'px-3 py-1 text-sm rounded-md',
+                    filter === 'pending' ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:text-gray-700'
+                  ]"
+                >
+                  Pending
+                </button>
+                <button
+                  @click="filter = 'completed'"
+                  :class="[
+                    'px-3 py-1 text-sm rounded-md',
+                    filter === 'completed' ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:text-gray-700'
+                  ]"
+                >
+                  Completed
+                </button>
+              </div>
+            </div>
+
+            <!-- Error Message -->
+            <div v-if="taskStore.error" class="mb-4 bg-danger-50 border border-danger-200 rounded-lg p-4">
+              <p class="text-sm text-danger-800">{{ taskStore.error }}</p>
+            </div>
+
+            <!-- Tasks -->
+            <div class="space-y-3">
+              <div
+                v-for="task in filteredTasks"
+                :key="task.id"
+                class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                <div class="flex items-center space-x-3 flex-1">
+                  <input
+                    type="checkbox"
+                    :checked="task.completed"
+                    @change="toggleTask(task)"
+                    class="h-5 w-5 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+                  />
+                  
+                  <div class="flex-1">
+                    <h3 :class="[
+                      'font-medium',
+                      task.completed ? 'line-through text-gray-500' : 'text-gray-900'
+                    ]">
+                      {{ task.title }}
+                    </h3>
+                    <p v-if="task.description" :class="[
+                      'text-sm',
+                      task.completed ? 'text-gray-400' : 'text-gray-600'
+                    ]">
+                      {{ task.description }}
+                    </p>
+                    <div class="flex items-center space-x-3 mt-1">
+                      <span :class="[
+                        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
+                        task.priority === 'high' ? 'bg-danger-100 text-danger-800' :
+                        task.priority === 'medium' ? 'bg-warning-100 text-warning-800' :
+                        'bg-gray-100 text-gray-800'
+                      ]">
+                        {{ task.priority }}
+                      </span>
+                      <span v-if="task.dueDate" class="text-xs text-gray-500">
+                        Due: {{ formatDate(task.dueDate) }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  @click="deleteTask(task.id)"
+                  class="text-gray-400 hover:text-danger-600 ml-4"
+                >
+                  <TrashIcon class="h-5 w-5" />
+                </button>
+              </div>
+
+              <div v-if="filteredTasks.length === 0" class="text-center py-8 text-gray-500">
+                <ClipboardDocumentListIcon class="mx-auto h-12 w-12 text-gray-400" />
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No tasks</h3>
+                <p class="mt-1 text-sm text-gray-500">
+                  {{ filter === 'all' ? 'Get started by creating a new task.' : `No ${filter} tasks found.` }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { usePlayerStore } from '@/stores/player'
-import { useQuestStore } from '@/stores/quest'
-import XpBar from '@/components/XpBar.vue'
-import QuestCard from '@/components/QuestCard.vue'
+import { useRouter } from 'vue-router'
+import {
+  ClipboardDocumentListIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  ExclamationTriangleIcon,
+  TrashIcon
+} from '@heroicons/vue/24/outline'
+import { useAuthStore } from '@/stores/auth'
+import { useTaskStore } from '@/stores/tasks'
+import type { CreateTaskInput } from '@/types'
 
-const playerStore = usePlayerStore()
-const questStore = useQuestStore()
+const router = useRouter()
+const authStore = useAuthStore()
+const taskStore = useTaskStore()
 
-const showCreateQuest = ref(false)
-const newQuest = ref({
+const filter = ref<'all' | 'pending' | 'completed'>('all')
+
+const newTask = ref<CreateTaskInput>({
   title: '',
   description: '',
-  difficulty: 'Medium' as const,
-  dueDate: new Date().toISOString().slice(0, 16),
-  priority: 'Medium' as const,
-  category: 'General',
-  estimatedTime: 60,
-  tags: [] as string[]
+  priority: 'medium',
+  dueDate: ''
 })
 
-// Computed properties
-const todaysQuests = computed(() => questStore.todaysQuests)
-const overdueQuests = computed(() => questStore.overdueTasks)
-const completedToday = computed(() => questStore.completedQuestsToday)
-
-const todayProgress = computed(() => {
-  if (todaysQuests.value.length === 0) return 0
-  return (completedToday.value.length / todaysQuests.value.length) * 100
-})
-
-const streakMessage = computed(() => {
-  const streak = playerStore.stats?.currentStreak || 0
-  if (streak === 0) return "Start your streak today! 💪"
-  if (streak < 3) return "Keep it up! 🔥"
-  if (streak < 7) return "You're on fire! 🚀"
-  if (streak < 14) return "Incredible consistency! ⭐"
-  return "You're a productivity legend! 👑"
-})
-
-// Mock achievements for demo
-const recentAchievements = ref([
-  { id: '1', name: 'First Blood', description: 'Completed first quest', icon: '🗡️' },
-  { id: '2', name: 'Early Bird', description: 'Completed quest before due date', icon: '🐦' }
-])
-
-const dailyTips = [
-  "Break large tasks into smaller quests for more XP!",
-  "Complete tasks early for bonus XP rewards!",
-  "Set recurring quests for daily habits!",
-  "Use different difficulty levels to match your energy!",
-  "Check your achievements to see what you can unlock!",
-  "The early quest gets the XP! Start your day strong!",
-  "Don't forget to celebrate your victories, no matter how small!",
-  "Productivity is a superpower - use it wisely!"
-]
-
-const dailyTip = computed(() => {
-  const today = new Date().getDate()
-  return dailyTips[today % dailyTips.length]
-})
-
-// Actions
-const createQuest = async () => {
-  const xpRewards = {
-    Easy: 25,
-    Medium: 50,
-    Hard: 100,
-    Epic: 200,
-    Legendary: 500
+const filteredTasks = computed(() => {
+  switch (filter.value) {
+    case 'pending':
+      return taskStore.pendingTasks
+    case 'completed':
+      return taskStore.completedTasks
+    default:
+      return taskStore.tasks
   }
+})
 
-  const questData = {
-    ...newQuest.value,
-    description: newQuest.value.description || `Complete this ${newQuest.value.difficulty.toLowerCase()} quest to gain XP!`,
-    xpReward: xpRewards[newQuest.value.difficulty],
-    coinReward: Math.floor(xpRewards[newQuest.value.difficulty] / 2),
-    isCompleted: false,
-    isRecurring: false
-  }
+const createTask = async () => {
+  if (!newTask.value.title.trim()) return
 
-  await questStore.createQuest(questData)
-  
+  await taskStore.createTask({
+    ...newTask.value,
+    dueDate: newTask.value.dueDate || undefined
+  })
+
   // Reset form
-  newQuest.value.title = ''
-  newQuest.value.description = ''
-  newQuest.value.difficulty = 'Medium'
-  newQuest.value.dueDate = new Date().toISOString().slice(0, 16)
-  
-  showCreateQuest.value = false
-}
-
-const completeQuest = async (questId: string) => {
-  await questStore.completeQuest(questId)
-}
-
-const editQuest = (questId: string) => {
-  // TODO: Implement edit functionality
-  console.log('Edit quest:', questId)
-}
-
-const deleteQuest = async (questId: string) => {
-  if (confirm('Are you sure you want to delete this quest?')) {
-    await questStore.deleteQuest(questId)
+  newTask.value = {
+    title: '',
+    description: '',
+    priority: 'medium',
+    dueDate: ''
   }
+}
+
+const toggleTask = async (task: any) => {
+  await taskStore.updateTask({
+    id: task.id,
+    completed: !task.completed
+  })
+}
+
+const deleteTask = async (id: string) => {
+  if (confirm('Are you sure you want to delete this task?')) {
+    await taskStore.deleteTask(id)
+  }
+}
+
+const signOut = async () => {
+  await authStore.signOut()
+  router.push('/login')
+}
+
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 
 onMounted(() => {
-  // Load data
-  playerStore.loadPlayerData()
-  questStore.loadQuests()
+  taskStore.loadTasks()
 })
 </script>
